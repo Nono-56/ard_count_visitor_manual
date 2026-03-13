@@ -1,0 +1,19 @@
+{
+  "name": "ard-count-visitor-manual",
+  "version": "1.0.0",
+  "description": "Event visitor count tracker for staff operations",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node tests/app.test.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^5.1.0"
+  }
+}

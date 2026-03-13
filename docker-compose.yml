@@ -1,0 +1,24 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "3000"
+    ports:
+      - "${LOCAL_PORT:-1315}:3000"
+    volumes:
+      - sqlite_data:/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.2.1
+    restart: unless-stopped
+    depends_on:
+      - app
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    env_file:
+      - .env
+
+volumes:
+  sqlite_data:

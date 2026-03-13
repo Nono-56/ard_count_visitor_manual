@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ログイン | 来場者数管理</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="auth-page">
+    <main class="auth-card">
+      <p class="eyebrow">Event Counter</p>
+      <h1>スタッフログイン</h1>
+      <p class="muted">Cloudflare 側の保護に加えて、アプリ内でも共通パスワード認証を行います。</p>
+
+      <% if (notice) { %>
+        <div class="banner success"><%= notice %></div>
+      <% } %>
+      <% if (error) { %>
+        <div class="banner error"><%= error %></div>
+      <% } %>
+
+      <form method="post" action="/auth/login" class="stack">
+        <label>
+          共通パスワード
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="primary">ログイン</button>
+      </form>
+    </main>
+  </body>
+</html>

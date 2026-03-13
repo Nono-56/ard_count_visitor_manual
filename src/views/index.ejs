@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= settings.eventName %> | 来場者数管理</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow"><%= settings.eventDate %> / <%= settings.timezone %></p>
+        <h1><%= settings.eventName %></h1>
+        <p class="muted">公開ホスト: <%= settings.publicHostname %></p>
+      </div>
+      <form method="post" action="/auth/logout">
+        <button type="submit" class="secondary">ログアウト</button>
+      </form>
+    </header>
+
+    <main class="grid">
+      <% if (notice) { %>
+        <div class="banner success full"><%= notice %></div>
+      <% } %>
+      <% if (error) { %>
+        <div class="banner error full"><%= error %></div>
+      <% } %>
+
+      <section class="card hero">
+        <p class="eyebrow">Current Total</p>
+        <div class="total"><%= dashboard.total %></div>
+        <p class="muted">
+          最新操作:
+          <% if (dashboard.recentEvents[0]) { %>
+            <%= formatDateTime(dashboard.recentEvents[0].occurredAt) %> /
+            <%= dashboard.recentEvents[0].kind === 'increment' ? '来場登録' : '調整' %> /
+            <%= describeDelta(dashboard.recentEvents[0].delta) %>
+          <% } else { %>
+            まだ記録がありません
+          <% } %>
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>人数登録</h2>
+        <div class="quick-actions">
+          <form method="post" action="/count-events">
+            <input type="hidden" name="delta" value="1" />
+            <button type="submit" class="quick">1人</button>
+          </form>
+          <form method="post" action="/count-events">
+            <input type="hidden" name="delta" value="2" />
+            <button type="submit" class="quick">2人</button>
+          </form>
+          <form method="post" action="/count-events">
+            <input type="hidden" name="delta" value="3" />
+            <button type="submit" class="quick">3人</button>
+          </form>
+          <form method="post" action="/count-events">
+            <input type="hidden" name="delta" value="4" />
+            <button type="submit" class="quick">4人</button>
+          </form>
+        </div>
+
+        <form method="post" action="/count-events" class="stack">
+          <label>
+            任意の人数
+            <input type="number" name="delta" min="1" step="1" required />
+          </label>
+          <label>
+            メモ
+            <input type="text" name="reason" maxlength="120" placeholder="団体来場など" />
+          </label>
+          <button type="submit" class="primary">人数を登録</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>メモ</h2>
+        <form method="post" action="/notes" class="stack">
+          <label>
+            内容
+            <textarea name="body" rows="3" maxlength="300" required></textarea>
+          </label>
+          <button type="submit" class="secondary">メモを追加</button>
+        </form>
+
+        <div class="list">
+          <% for (const note of dashboard.notes) { %>
+            <article class="list-item">
+              <strong><%= formatDateTime(note.notedAt) %></strong>
+              <p><%= note.body %></p>
+            </article>
+          <% } %>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <h2>時間帯別集計</h2>
+          <a href="/export.csv" class="link-button">CSV 出力</a>
+        </div>
+        <div class="list">
+          <% for (const bucket of dashboard.hourlyBuckets) { %>
+            <article class="list-item inline">
+              <strong><%= bucket.label %>時台</strong>
+              <span><%= bucket.total %>人</span>
+            </article>
+          <% } %>
+          <% if (dashboard.hourlyBuckets.length === 0) { %>
+            <p class="muted">まだ記録がありません。</p>
+          <% } %>
+        </div>
+      </section>
+
+      <section class="card wide" id="log">
+        <h2>操作ログ</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>時刻</th>
+                <th>内容</th>
+                <th>メモ</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% for (const event of dashboard.recentEvents) { %>
+                <% if (editingEvent && editingEvent.id === event.id) { %>
+                  <% const editFormId = `edit-event-${event.id}`; %>
+                  <tr class="editing-row">
+                    <td>
+                      <form id="<%= editFormId %>" method="post" action="/count-events/<%= event.id %>/update">
+                        <input type="hidden" name="editEventId" value="<%= event.id %>" />
+                        <input type="datetime-local" name="occurredAt" value="<%= formatDateTimeInput(event.occurredAt) %>" required />
+                      </form>
+                    </td>
+                    <td>
+                      <input type="number" name="delta" step="1" value="<%= event.delta %>" form="<%= editFormId %>" required />
+                    </td>
+                    <td>
+                      <input type="text" name="reason" maxlength="120" value="<%= event.reason %>" form="<%= editFormId %>" />
+                    </td>
+                    <td>
+                      <div class="row-actions">
+                        <button type="submit" form="<%= editFormId %>" class="secondary small">保存</button>
+                        <a href="/#log" class="link-button small">戻る</a>
+                      </div>
+                    </td>
+                  </tr>
+                <% } else { %>
+                  <tr>
+                    <td><%= formatDateTime(event.occurredAt) %></td>
+                    <td><%= describeDelta(event.delta) %></td>
+                    <td><%= event.reason || '-' %></td>
+                    <td>
+                      <div class="row-actions">
+                        <a href="/?editEventId=<%= event.id %>#log" class="link-button small">編集</a>
+                        <form method="post" action="/count-events/<%= event.id %>/delete" onsubmit="return confirm('この記録を削除しますか？');">
+                          <button type="submit" class="warning small">削除</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                <% } %>
+              <% } %>
+            </tbody>
+          </table>
+          <% if (dashboard.recentEvents.length === 0) { %>
+            <p class="muted">まだ操作ログがありません。</p>
+          <% } %>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
