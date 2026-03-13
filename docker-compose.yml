@@ -9,7 +9,7 @@ services:
     ports:
       - "${LOCAL_PORT:-1315}:3000"
     volumes:
-      - sqlite_data:/data
+      - /home/admin/ard_count_visitor_manual/data:/data
 
   cloudflared:
     image: cloudflare/cloudflared:2025.2.1
@@ -19,6 +19,3 @@ services:
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     env_file:
       - .env
-
-volumes:
-  sqlite_data:

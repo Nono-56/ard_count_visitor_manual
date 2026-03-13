@@ -264,7 +264,7 @@ function handleInvalidRequest(req, res, message) {
     setFlashCookie(res, { error: message }, {
       secure: req.secure || req.protocol === 'https' || process.env.NODE_ENV === 'production'
     });
-    return res.redirect('/' + buildDashboardQuery(req.body.selectedDate, req.body.editEventId) + '#log');
+    return res.redirect(buildRedirectTarget(req));
   }
   return res.status(400).json({ error: message });
 }
@@ -274,7 +274,7 @@ function handleSuccess(req, res, message) {
     setFlashCookie(res, { notice: message }, {
       secure: req.secure || req.protocol === 'https' || process.env.NODE_ENV === 'production'
     });
-    return res.redirect('/' + buildDashboardQuery(req.body.selectedDate) + '#log');
+    return res.redirect(buildRedirectTarget(req));
   }
   return res.status(201).json({ ok: true, message });
 }
@@ -360,6 +360,12 @@ function buildDashboardQuery(selectedDate, editEventId) {
   }
   const query = params.toString();
   return query ? `?${query}` : '';
+}
+
+function buildRedirectTarget(req) {
+  const base = '/' + buildDashboardQuery(req.body.selectedDate, req.body.editEventId);
+  const returnToLog = String(req.body.returnToLog || '') === '1';
+  return returnToLog ? `${base}#log` : base;
 }
 
 module.exports = {
