@@ -14,6 +14,10 @@ async function main() {
     eventEndDate: config.eventEndDate,
     timezone: config.eventTimezone,
     publicHostname: config.publicHostname,
+    day1Start: config.day1Start,
+    day1End: config.day1End,
+    day2Start: config.day2Start,
+    day2End: config.day2End,
     staffPasswordHash: createPasswordHash(config.appPassword)
   });
 

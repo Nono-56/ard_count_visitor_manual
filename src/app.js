@@ -102,8 +102,7 @@ function createApp({ repo, config }) {
     res.render('index', {
       dashboard,
       settings,
-      editingEvent,
-      defaultOccurredAt: buildDefaultOccurredAt(selectedDate, settings.timezone)
+      editingEvent
     });
   });
 
@@ -125,13 +124,10 @@ function createApp({ repo, config }) {
   app.post('/count-events', requireAuth, async (req, res) => {
     const delta = Number.parseInt(String(req.body.delta || ''), 10);
     const reason = String(req.body.reason || '').trim();
-    const occurredAt = parseIsoOrNow(req.body.occurredAt);
+    const occurredAt = new Date().toISOString();
 
     if (!Number.isInteger(delta) || delta === 0) {
       return handleInvalidRequest(req, res, '人数は 0 以外の整数で入力してください。');
-    }
-    if (!occurredAt) {
-      return handleInvalidRequest(req, res, '日時の形式が不正です。');
     }
     await repo.createCountEvent({
       kind: 'increment',
@@ -246,7 +242,11 @@ function sanitizeSettings(settings) {
     eventDate: settings.eventDate,
     eventEndDate: settings.eventEndDate,
     timezone: settings.timezone,
-    publicHostname: settings.publicHostname
+    publicHostname: settings.publicHostname,
+    day1Start: settings.day1Start,
+    day1End: settings.day1End,
+    day2Start: settings.day2Start,
+    day2End: settings.day2End
   };
 }
 
@@ -327,18 +327,6 @@ function resolveSelectedDate(value, settings) {
     return value;
   }
   return availableDates[0];
-}
-
-function buildDefaultOccurredAt(selectedDate, timeZone) {
-  const nowParts = new Intl.DateTimeFormat('sv-SE', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23'
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(nowParts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
-  return `${selectedDate}T${values.hour}:${values.minute}:${values.second}+09:00`;
 }
 
 function buildDashboardQuery(selectedDate, editEventId) {

@@ -9,6 +9,7 @@
   <body>
     <header class="page-header">
       <div>
+        <% const formatTime = (value) => value ? value.split('T')[1].slice(0, 5) : ''; %>
         <p class="eyebrow">
           <%= settings.eventDate %>
           <% if (settings.eventEndDate && settings.eventEndDate !== settings.eventDate) { %>
@@ -17,7 +18,10 @@
           / <%= settings.timezone %>
         </p>
         <h1><%= settings.eventName %></h1>
-        <!-- <p class="muted">公開ホスト: <%= settings.publicHostname %></p> -->
+        <p class="muted">
+          Day1: <%= settings.eventDate %> <%= formatTime(settings.day1Start) %>-<%= formatTime(settings.day1End) %>
+          / Day2: <%= settings.eventEndDate %> <%= formatTime(settings.day2Start) %>-<%= formatTime(settings.day2End) %>
+        </p>
       </div>
       <form method="post" action="/auth/logout">
         <button type="submit" class="secondary">ログアウト</button>
@@ -68,25 +72,21 @@
         <div class="quick-actions">
           <form method="post" action="/count-events" class="count-form">
             <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
-            <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="1" />
             <button type="submit" class="quick">1人</button>
           </form>
           <form method="post" action="/count-events" class="count-form">
             <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
-            <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="2" />
             <button type="submit" class="quick">2人</button>
           </form>
           <form method="post" action="/count-events" class="count-form">
             <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
-            <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="3" />
             <button type="submit" class="quick">3人</button>
           </form>
           <form method="post" action="/count-events" class="count-form">
             <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
-            <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="4" />
             <button type="submit" class="quick">4人</button>
           </form>
@@ -94,7 +94,6 @@
 
         <form method="post" action="/count-events" class="stack count-form" data-reset="1">
           <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
-          <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
           <label>
             任意の人数
             <input type="number" name="delta" min="1" step="1" required />
@@ -121,21 +120,12 @@
           <% } %>
         </div>
         <div class="comparison-chart" id="hourly-chart">
-          <% dashboard.hourlyComparison.hours.forEach((hour, index) => { %>
-            <div class="hour-group">
-              <div class="bars">
-                <% for (const series of dashboard.hourlyComparison.series) { %>
-                  <% const total = series.totals[index]; %>
-                  <div class="bar <%= series.key %>" style="height: <%= series.percents[index] %>%">
-                    <% if (total > 0) { %>
-                      <span class="bar-value"><%= total %></span>
-                    <% } %>
-                  </div>
-                <% } %>
-              </div>
-              <div class="hour-label"><%= hour %></div>
-            </div>
-          <% }) %>
+          <svg class="line-chart" viewBox="0 0 240 120" preserveAspectRatio="none"></svg>
+          <div class="hour-labels">
+            <% dashboard.hourlyComparison.hours.forEach((hour) => { %>
+              <span><%= hour %></span>
+            <% }) %>
+          </div>
         </div>
         <p class="muted">最大値: <span id="hourly-max"><%= dashboard.hourlyComparison.maxTotal %></span>人</p>
       </section>
@@ -328,23 +318,34 @@
             `)
             .join('');
 
-          hourlyChart.innerHTML = dashboard.hourlyComparison.hours
-            .map((hour, index) => {
-              const bars = dashboard.hourlyComparison.series
-                .map((series) => {
-                  const total = series.totals[index];
-                  const label = total > 0 ? `<span class="bar-value">${total}</span>` : '';
-                  return `<div class="bar ${series.key}" style="height: ${series.percents[index]}%">${label}</div>`;
-                })
-                .join('');
-              return `
-                <div class="hour-group">
-                  <div class="bars">${bars}</div>
-                  <div class="hour-label">${hour}</div>
-                </div>
-              `;
+          const svg = hourlyChart.querySelector('svg');
+          const labels = hourlyChart.querySelector('.hour-labels');
+          if (!svg || !labels) {
+            return;
+          }
+          labels.innerHTML = dashboard.hourlyComparison.hours.map((hour) => `<span>${hour}</span>`).join('');
+          const maxTotal = dashboard.hourlyComparison.maxTotal || 1;
+          const width = 240;
+          const height = 120;
+          const paddingTop = 10;
+          const paddingBottom = 16;
+          const plotHeight = height - paddingTop - paddingBottom;
+          const step = width / (dashboard.hourlyComparison.hours.length - 1);
+          const lines = dashboard.hourlyComparison.series
+            .map((series) => {
+              const points = series.totals.map((total, index) => {
+                const x = Math.round(index * step);
+                const ratio = Math.min(total / maxTotal, 1);
+                const y = Math.round(paddingTop + (1 - ratio) * plotHeight);
+                return `${x},${y}`;
+              }).join(' ');
+              return `<polyline class="line ${series.key}" points="${points}" />`;
             })
             .join('');
+          svg.innerHTML = `
+            <rect class="line-grid" x="0" y="${paddingTop}" width="${width}" height="${plotHeight}" rx="12" />
+            ${lines}
+          `;
           hourlyMax.textContent = dashboard.hourlyComparison.maxTotal;
         }
 
@@ -415,7 +416,7 @@
         }
 
         async function refreshDashboard() {
-          const response = await fetch('/dashboard', {
+          const response = await fetch(`/dashboard${window.location.search}`, {
             headers: {
               accept: 'application/json'
             }

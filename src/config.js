@@ -17,7 +17,11 @@ function loadConfig() {
     eventDate: process.env.EVENT_DATE || new Date().toISOString().slice(0, 10),
     eventEndDate: process.env.EVENT_END_DATE || process.env.EVENT_DATE || new Date().toISOString().slice(0, 10),
     eventTimezone: process.env.EVENT_TIMEZONE || 'Asia/Tokyo',
-    publicHostname: process.env.PUBLIC_HOSTNAME || 'localhost'
+    publicHostname: process.env.PUBLIC_HOSTNAME || 'localhost',
+    day1Start: required('DAY1_START'),
+    day1End: required('DAY1_END'),
+    day2Start: required('DAY2_START'),
+    day2End: required('DAY2_END')
   };
 }
 

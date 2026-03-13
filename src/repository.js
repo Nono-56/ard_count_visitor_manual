@@ -21,6 +21,10 @@ class SQLiteRepository {
         event_end_date TEXT NOT NULL DEFAULT '',
         timezone TEXT NOT NULL,
         public_hostname TEXT NOT NULL,
+        day1_start TEXT NOT NULL DEFAULT '',
+        day1_end TEXT NOT NULL DEFAULT '',
+        day2_start TEXT NOT NULL DEFAULT '',
+        day2_end TEXT NOT NULL DEFAULT '',
         staff_password_hash TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
         updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
@@ -40,6 +44,10 @@ class SQLiteRepository {
       ON count_events (occurred_at DESC);
     `);
     ensureColumn(this.db, 'event_settings', 'event_end_date', `ALTER TABLE event_settings ADD COLUMN event_end_date TEXT NOT NULL DEFAULT ''`);
+    ensureColumn(this.db, 'event_settings', 'day1_start', `ALTER TABLE event_settings ADD COLUMN day1_start TEXT NOT NULL DEFAULT ''`);
+    ensureColumn(this.db, 'event_settings', 'day1_end', `ALTER TABLE event_settings ADD COLUMN day1_end TEXT NOT NULL DEFAULT ''`);
+    ensureColumn(this.db, 'event_settings', 'day2_start', `ALTER TABLE event_settings ADD COLUMN day2_start TEXT NOT NULL DEFAULT ''`);
+    ensureColumn(this.db, 'event_settings', 'day2_end', `ALTER TABLE event_settings ADD COLUMN day2_end TEXT NOT NULL DEFAULT ''`);
     ensureColumn(this.db, 'count_events', 'deleted_at', `ALTER TABLE count_events ADD COLUMN deleted_at TEXT NOT NULL DEFAULT ''`);
   }
 
@@ -50,14 +58,20 @@ class SQLiteRepository {
   async syncSettings(settings) {
     const statement = this.db.prepare(`
       INSERT INTO event_settings (
-        id, event_name, event_date, event_end_date, timezone, public_hostname, staff_password_hash, created_at, updated_at
-      ) VALUES (1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        id, event_name, event_date, event_end_date, timezone, public_hostname,
+        day1_start, day1_end, day2_start, day2_end,
+        staff_password_hash, created_at, updated_at
+      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
         event_name = excluded.event_name,
         event_date = excluded.event_date,
         event_end_date = excluded.event_end_date,
         timezone = excluded.timezone,
         public_hostname = excluded.public_hostname,
+        day1_start = excluded.day1_start,
+        day1_end = excluded.day1_end,
+        day2_start = excluded.day2_start,
+        day2_end = excluded.day2_end,
         staff_password_hash = excluded.staff_password_hash,
         updated_at = CURRENT_TIMESTAMP
     `);
@@ -67,6 +81,10 @@ class SQLiteRepository {
       settings.eventEndDate,
       settings.timezone,
       settings.publicHostname,
+      settings.day1Start,
+      settings.day1End,
+      settings.day2Start,
+      settings.day2End,
       settings.staffPasswordHash
     );
     return this.getSettings();
@@ -74,7 +92,8 @@ class SQLiteRepository {
 
   async getSettings() {
     const row = this.db.prepare(`
-      SELECT id, event_name, event_date, event_end_date, timezone, public_hostname, staff_password_hash
+      SELECT id, event_name, event_date, event_end_date, timezone, public_hostname,
+        day1_start, day1_end, day2_start, day2_end, staff_password_hash
       FROM event_settings
       WHERE id = 1
     `).get();
@@ -169,7 +188,7 @@ class SQLiteRepository {
     const selectedEvents = events.filter((event) => buildDateKey(event.occurredAt, settings.timezone) === activeDate);
     const hourlyBuckets = buildHourlyBuckets(selectedEvents, settings.timezone).slice(0, 24);
     const comparisonDates = availableDates.slice(0, 2);
-    const hourlyComparison = buildHourlyComparison(events, settings.timezone, comparisonDates);
+    const hourlyComparison = buildHourlyComparison(events, settings.timezone, comparisonDates, 10, 21);
     const selectedLogEvents = allEvents
       .filter((event) => buildDateKey(event.occurredAt, settings.timezone) === activeDate)
       .sort(compareByOccurredDesc)
@@ -216,10 +235,12 @@ function buildDateKey(value, timezone) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function buildHourlyComparison(events, timezone, dates) {
-  const hours = Array.from({ length: 24 }, (_value, index) => String(index).padStart(2, '0'));
+function buildHourlyComparison(events, timezone, dates, startHour = 0, endHour = 24) {
+  const hours = Array.from({ length: endHour - startHour }, (_value, index) =>
+    String(startHour + index).padStart(2, '0')
+  );
   const series = dates.map((date, index) => {
-    const totals = buildHourlyTotalsForDate(events, timezone, date);
+    const totals = buildHourlyTotalsForDate(events, timezone, date, startHour, endHour);
     return {
       key: index === 0 ? 'day-a' : 'day-b',
       date,
@@ -235,16 +256,16 @@ function buildHourlyComparison(events, timezone, dates) {
   return { hours, series: normalizedSeries, maxTotal };
 }
 
-function buildHourlyTotalsForDate(events, timezone, dateKey) {
-  const totals = Array.from({ length: 24 }, () => 0);
+function buildHourlyTotalsForDate(events, timezone, dateKey, startHour = 0, endHour = 24) {
+  const totals = Array.from({ length: endHour - startHour }, () => 0);
   for (const event of events) {
     if (buildDateKey(event.occurredAt, timezone) !== dateKey) {
       continue;
     }
     const parts = getDateParts(event.occurredAt, timezone);
     const hour = Number(parts.hour);
-    if (Number.isInteger(hour) && hour >= 0 && hour < 24) {
-      totals[hour] += event.delta;
+    if (Number.isInteger(hour) && hour >= startHour && hour < endHour) {
+      totals[hour - startHour] += event.delta;
     }
   }
   return totals;
@@ -298,6 +319,10 @@ function mapSetting(row) {
     eventEndDate: row.event_end_date || row.event_date,
     timezone: row.timezone,
     publicHostname: row.public_hostname,
+    day1Start: row.day1_start,
+    day1End: row.day1_end,
+    day2Start: row.day2_start,
+    day2End: row.day2_end,
     staffPasswordHash: row.staff_password_hash
   };
 }

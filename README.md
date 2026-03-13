@@ -27,6 +27,12 @@ Linux 上で `Docker Compose + SQLite + cloudflared` を使って動かし、ス
 ```env
 APP_PASSWORD=strong-password
 SESSION_SECRET=long-random-secret
+EVENT_DATE=2026-03-14
+EVENT_END_DATE=2026-03-15
+DAY1_START=2026-03-14T10:00:00+09:00
+DAY1_END=2026-03-14T20:00:00+09:00
+DAY2_START=2026-03-15T10:00:00+09:00
+DAY2_END=2026-03-15T20:00:00+09:00
 PUBLIC_HOSTNAME=visitor.example.com
 SQLITE_PATH=/data/visitor.sqlite
 CLOUDFLARE_TUNNEL_TOKEN=your-tunnel-token

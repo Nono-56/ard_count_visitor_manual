@@ -266,54 +266,51 @@ button,
 
 .comparison-chart {
   display: grid;
-  grid-template-columns: repeat(24, minmax(0, 1fr));
-  gap: 8px;
-  align-items: end;
+  gap: 10px;
   min-height: 220px;
-  padding: 12px 4px 6px;
+  padding: 12px;
   border: 1px solid #eee5d8;
   border-radius: 16px;
   background: #fdfaf5;
 }
 
-.hour-group {
-  display: grid;
-  gap: 6px;
-  align-items: end;
-  height: 100%;
-}
-
-.bars {
-  display: grid;
-  grid-auto-flow: column;
-  gap: 6px;
-  align-items: end;
-  height: 100%;
-}
-
-.bar {
+.line-chart {
   width: 100%;
-  border-radius: 10px 10px 6px 6px;
-  position: relative;
-  min-height: 8px;
-  opacity: 0.9;
+  height: 180px;
 }
 
-.bar-value {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--ink);
-  white-space: nowrap;
+.line-grid {
+  fill: transparent;
+  stroke: #eee5d8;
+  stroke-width: 1;
 }
 
-.hour-label {
+.line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.line.day-a {
+  stroke: #0d9488;
+}
+
+.line.day-b {
+  stroke: #f59e0b;
+}
+
+.hour-labels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.hour-labels span {
   font-size: 0.75rem;
   text-align: center;
   color: var(--muted);
+  display: block;
 }
 
 .table-wrap {
@@ -378,11 +375,14 @@ td {
   }
 
   .comparison-chart {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    row-gap: 16px;
+    padding: 10px;
   }
 
-  .hour-group {
-    min-height: 140px;
+  .line-chart {
+    height: 160px;
+  }
+
+  .hour-labels {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   }
 }
