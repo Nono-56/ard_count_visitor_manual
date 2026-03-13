@@ -32,23 +32,15 @@ class SQLiteRepository {
         kind TEXT NOT NULL CHECK (kind IN ('increment', 'correction')),
         delta INTEGER NOT NULL,
         reason TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+        created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+        deleted_at TEXT NOT NULL DEFAULT ''
       );
 
       CREATE INDEX IF NOT EXISTS count_events_occurred_at_idx
       ON count_events (occurred_at DESC);
-
-      CREATE TABLE IF NOT EXISTS notes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        noted_at TEXT NOT NULL,
-        body TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
-      );
-
-      CREATE INDEX IF NOT EXISTS notes_noted_at_idx
-      ON notes (noted_at DESC);
     `);
     ensureColumn(this.db, 'event_settings', 'event_end_date', `ALTER TABLE event_settings ADD COLUMN event_end_date TEXT NOT NULL DEFAULT ''`);
+    ensureColumn(this.db, 'count_events', 'deleted_at', `ALTER TABLE count_events ADD COLUMN deleted_at TEXT NOT NULL DEFAULT ''`);
   }
 
   async close() {
@@ -107,6 +99,7 @@ class SQLiteRepository {
     const rows = this.db.prepare(`
       SELECT id, occurred_at, kind, delta, reason, created_at
       FROM count_events
+      WHERE deleted_at = ''
       ORDER BY occurred_at DESC, id DESC
       LIMIT ?
     `).all(limit);
@@ -117,6 +110,16 @@ class SQLiteRepository {
     const rows = this.db.prepare(`
       SELECT id, occurred_at, kind, delta, reason, created_at
       FROM count_events
+      WHERE deleted_at = ''
+      ORDER BY occurred_at ASC, id ASC
+    `).all();
+    return rows.map(mapCountEvent);
+  }
+
+  async listAllCountEventsIncludingDeleted() {
+    const rows = this.db.prepare(`
+      SELECT id, occurred_at, kind, delta, reason, created_at, deleted_at
+      FROM count_events
       ORDER BY occurred_at ASC, id ASC
     `).all();
     return rows.map(mapCountEvent);
@@ -124,7 +127,7 @@ class SQLiteRepository {
 
   async getCountEventById(id) {
     const row = this.db.prepare(`
-      SELECT id, occurred_at, kind, delta, reason, created_at
+      SELECT id, occurred_at, kind, delta, reason, created_at, deleted_at
       FROM count_events
       WHERE id = ?
     `).get(id);
@@ -142,44 +145,35 @@ class SQLiteRepository {
 
   async deleteCountEvent(id) {
     const result = this.db.prepare(`
-      DELETE FROM count_events
-      WHERE id = ?
+      UPDATE count_events
+      SET deleted_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND deleted_at = ''
     `).run(id);
     return result.changes > 0;
   }
 
-  async createNote(input) {
+  async restoreCountEvent(id) {
     const result = this.db.prepare(`
-      INSERT INTO notes (noted_at, body)
-      VALUES (?, ?)
-    `).run(input.notedAt, input.body);
-
-    const row = this.db.prepare(`
-      SELECT id, noted_at, body, created_at
-      FROM notes
-      WHERE id = ?
-    `).get(result.lastInsertRowid);
-    return mapNote(row);
-  }
-
-  async listNotes(limit = 50) {
-    const rows = this.db.prepare(`
-      SELECT id, noted_at, body, created_at
-      FROM notes
-      ORDER BY noted_at DESC, id DESC
-      LIMIT ?
-    `).all(limit);
-    return rows.map(mapNote);
+      UPDATE count_events
+      SET deleted_at = ''
+      WHERE id = ? AND deleted_at != ''
+    `).run(id);
+    return result.changes > 0;
   }
 
   async getDashboardData(settings, selectedDate) {
     const events = await this.listAllCountEvents();
-    const notes = await this.listNotes(200);
+    const allEvents = await this.listAllCountEventsIncludingDeleted();
     const availableDates = buildDateRange(settings.eventDate, settings.eventEndDate || settings.eventDate);
     const activeDate = availableDates.includes(selectedDate) ? selectedDate : availableDates[0];
     const selectedEvents = events.filter((event) => buildDateKey(event.occurredAt, settings.timezone) === activeDate);
-    const selectedNotes = notes.filter((note) => buildDateKey(note.notedAt, settings.timezone) === activeDate);
     const hourlyBuckets = buildHourlyBuckets(selectedEvents, settings.timezone).slice(0, 24);
+    const comparisonDates = availableDates.slice(0, 2);
+    const hourlyComparison = buildHourlyComparison(events, settings.timezone, comparisonDates);
+    const selectedLogEvents = allEvents
+      .filter((event) => buildDateKey(event.occurredAt, settings.timezone) === activeDate)
+      .sort(compareByOccurredDesc)
+      .slice(0, 20);
 
     return {
       total: selectedEvents.reduce((sum, event) => sum + event.delta, 0),
@@ -193,8 +187,8 @@ class SQLiteRepository {
           .reduce((sum, event) => sum + event.delta, 0)
       })),
       hourlyBuckets,
-      recentEvents: [...selectedEvents].sort(compareByOccurredDesc).slice(0, 20),
-      notes: [...selectedNotes].sort(compareByNotedDesc).slice(0, 20)
+      hourlyComparison,
+      recentEvents: selectedLogEvents
     };
   }
 }
@@ -220,6 +214,40 @@ function buildHourBucketKey(value, timezone) {
 function buildDateKey(value, timezone) {
   const values = getDateParts(value, timezone);
   return `${values.year}-${values.month}-${values.day}`;
+}
+
+function buildHourlyComparison(events, timezone, dates) {
+  const hours = Array.from({ length: 24 }, (_value, index) => String(index).padStart(2, '0'));
+  const series = dates.map((date, index) => {
+    const totals = buildHourlyTotalsForDate(events, timezone, date);
+    return {
+      key: index === 0 ? 'day-a' : 'day-b',
+      date,
+      totals
+    };
+  });
+  const maxTotal = Math.max(1, ...series.flatMap((entry) => entry.totals));
+  const normalizedSeries = series.map((entry) => ({
+    ...entry,
+    percents: entry.totals.map((total) => Math.round((total / maxTotal) * 100))
+  }));
+
+  return { hours, series: normalizedSeries, maxTotal };
+}
+
+function buildHourlyTotalsForDate(events, timezone, dateKey) {
+  const totals = Array.from({ length: 24 }, () => 0);
+  for (const event of events) {
+    if (buildDateKey(event.occurredAt, timezone) !== dateKey) {
+      continue;
+    }
+    const parts = getDateParts(event.occurredAt, timezone);
+    const hour = Number(parts.hour);
+    if (Number.isInteger(hour) && hour >= 0 && hour < 24) {
+      totals[hour] += event.delta;
+    }
+  }
+  return totals;
 }
 
 function getDateParts(value, timezone) {
@@ -262,13 +290,6 @@ function compareByOccurredDesc(a, b) {
   return a.occurredAt < b.occurredAt ? 1 : -1;
 }
 
-function compareByNotedDesc(a, b) {
-  if (a.notedAt === b.notedAt) {
-    return b.id - a.id;
-  }
-  return a.notedAt < b.notedAt ? 1 : -1;
-}
-
 function mapSetting(row) {
   return {
     id: row.id,
@@ -288,16 +309,8 @@ function mapCountEvent(row) {
     kind: row.kind,
     delta: Number(row.delta),
     reason: row.reason,
-    createdAt: row.created_at
-  };
-}
-
-function mapNote(row) {
-  return {
-    id: Number(row.id),
-    notedAt: row.noted_at,
-    body: row.body,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    deletedAt: row.deleted_at || ''
   };
 }
 

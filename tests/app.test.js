@@ -9,14 +9,13 @@ class MemoryRepository {
     this.settings = {
       eventName: 'テストイベント',
       eventDate: '2026-03-12',
+      eventEndDate: '2026-03-13',
       timezone: 'Asia/Tokyo',
       publicHostname: 'example.com',
       staffPasswordHash: createPasswordHash('secret123')
     };
     this.events = [];
-    this.notes = [];
     this.eventId = 1;
-    this.noteId = 1;
   }
 
   async getSettings() {
@@ -25,6 +24,8 @@ class MemoryRepository {
 
   async getDashboardData() {
     const total = this.events.reduce((sum, event) => sum + event.delta, 0);
+    const availableDates = buildDateRange(this.settings.eventDate, this.settings.eventEndDate || this.settings.eventDate);
+    const selectedDate = availableDates[0];
     const bucketMap = new Map();
 
     for (const event of this.events) {
@@ -34,22 +35,34 @@ class MemoryRepository {
       bucketMap.set(key, (bucketMap.get(key) || 0) + event.delta);
     }
 
+    const hourlyComparison = buildHourlyComparison(this.events, availableDates);
+
     return {
       total,
+      overallTotal: total,
+      availableDates,
+      selectedDate,
+      dailyTotals: availableDates.map((date) => ({
+        date,
+        total
+      })),
       hourlyBuckets: [...bucketMap.entries()]
         .map(([hourBucket, bucketTotal]) => ({ hourBucket, total: bucketTotal }))
         .sort((a, b) => (a.hourBucket < b.hourBucket ? 1 : -1)),
-      recentEvents: [...this.events].sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1)).slice(0, 20),
-      notes: [...this.notes].sort((a, b) => (a.notedAt < b.notedAt ? 1 : -1)).slice(0, 20)
+      hourlyComparison,
+      recentEvents: [...this.events].sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1)).slice(0, 20)
     };
   }
 
   async listCountEvents(limit = 200) {
-    return [...this.events].sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1)).slice(0, limit);
+    return [...this.events]
+      .filter((event) => !event.deletedAt)
+      .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
+      .slice(0, limit);
   }
 
   async listAllCountEvents() {
-    return [...this.events];
+    return [...this.events].filter((event) => !event.deletedAt);
   }
 
   async getCountEventById(id) {
@@ -72,32 +85,31 @@ class MemoryRepository {
     if (index === -1) {
       return false;
     }
-    this.events.splice(index, 1);
+    if (this.events[index].deletedAt) {
+      return false;
+    }
+    this.events[index].deletedAt = new Date().toISOString();
     return true;
   }
 
-  async listNotes(limit = 500) {
-    return [...this.notes].sort((a, b) => (a.notedAt < b.notedAt ? 1 : -1)).slice(0, limit);
+  async restoreCountEvent(id) {
+    const event = this.events.find((item) => item.id === id);
+    if (!event || !event.deletedAt) {
+      return false;
+    }
+    event.deletedAt = '';
+    return true;
   }
 
   async createCountEvent(input) {
     const event = {
       id: this.eventId++,
       createdAt: new Date().toISOString(),
+      deletedAt: '',
       ...input
     };
     this.events.push(event);
     return event;
-  }
-
-  async createNote(input) {
-    const note = {
-      id: this.noteId++,
-      createdAt: new Date().toISOString(),
-      ...input
-    };
-    this.notes.push(note);
-    return note;
   }
 }
 
@@ -203,19 +215,6 @@ async function testAuthenticatedUserFlow() {
     });
     assert.equal(createCorrection.status, 201);
 
-    const createNote = await fetch(`${baseUrl}/notes`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json',
-        cookie
-      },
-      body: JSON.stringify({
-        body: '入口が混雑'
-      })
-    });
-    assert.equal(createNote.status, 201);
-
     const dashboardResponse = await fetch(`${baseUrl}/dashboard`, {
       headers: {
         accept: 'application/json',
@@ -227,7 +226,6 @@ async function testAuthenticatedUserFlow() {
     const dashboard = await dashboardResponse.json();
     assert.equal(dashboard.total, 4);
     assert.equal(dashboard.recentEvents.length, 2);
-    assert.equal(dashboard.notes.length, 1);
 
     const csvResponse = await fetch(`${baseUrl}/export.csv`, {
       headers: {
@@ -326,6 +324,24 @@ async function testLogEntriesCanBeUpdatedAndDeleted() {
     });
     const afterDeletePayload = await afterDeleteResponse.json();
     assert.equal(afterDeletePayload.events.length, 0);
+
+    const restoreResponse = await fetch(`${baseUrl}/count-events/${eventId}/restore`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        cookie
+      }
+    });
+    assert.equal(restoreResponse.status, 201);
+
+    const afterRestoreResponse = await fetch(`${baseUrl}/count-events`, {
+      headers: {
+        accept: 'application/json',
+        cookie
+      }
+    });
+    const afterRestorePayload = await afterRestoreResponse.json();
+    assert.equal(afterRestorePayload.events.length, 1);
   } finally {
     await stopTestServer(server);
   }
@@ -365,3 +381,43 @@ run().catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
+function buildDateRange(startDate, endDate) {
+  const dates = [];
+  const current = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return dates;
+}
+
+function buildHourlyComparison(events, availableDates) {
+  const hours = Array.from({ length: 24 }, (_value, index) => String(index).padStart(2, '0'));
+  const series = availableDates.slice(0, 2).map((date, index) => {
+    const totals = Array.from({ length: 24 }, () => 0);
+    for (const event of events) {
+      const eventDate = new Date(event.occurredAt).toISOString().slice(0, 10);
+      if (eventDate !== date) {
+        continue;
+      }
+      const hour = new Date(event.occurredAt).getUTCHours();
+      totals[hour] += event.delta;
+    }
+    return {
+      key: index === 0 ? 'day-a' : 'day-b',
+      date,
+      totals
+    };
+  });
+  const maxTotal = Math.max(1, ...series.flatMap((entry) => entry.totals));
+  const normalizedSeries = series.map((entry) => ({
+    ...entry,
+    percents: entry.totals.map((total) => Math.round((total / maxTotal) * 100))
+  }));
+
+  return { hours, series: normalizedSeries, maxTotal };
+}

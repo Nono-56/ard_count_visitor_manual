@@ -17,7 +17,7 @@
           / <%= settings.timezone %>
         </p>
         <h1><%= settings.eventName %></h1>
-        <p class="muted">公開ホスト: <%= settings.publicHostname %></p>
+        <!-- <p class="muted">公開ホスト: <%= settings.publicHostname %></p> -->
       </div>
       <form method="post" action="/auth/logout">
         <button type="submit" class="secondary">ログアウト</button>
@@ -37,7 +37,7 @@
           <h2>表示日</h2>
           <p class="muted">2日間のイベントを日別に切り替えて確認できます。</p>
         </div>
-        <div class="day-tabs">
+        <div class="day-tabs" id="day-tabs">
           <% for (const dayTotal of dashboard.dailyTotals) { %>
             <a href="/?day=<%= dayTotal.date %>" class="day-tab <%= dashboard.selectedDate === dayTotal.date ? 'active' : '' %>">
               <strong><%= dayTotal.date %></strong>
@@ -49,16 +49,16 @@
 
       <section class="card hero">
         <p class="eyebrow">Selected Day Total</p>
-        <div class="total"><%= dashboard.total %></div>
-        <p class="muted">表示中の日付: <%= dashboard.selectedDate %></p>
-        <p class="muted">
-          期間合計: <%= dashboard.overallTotal %>人 /
+        <div class="total" id="selected-total"><%= dashboard.total %></div>
+        <p class="muted">表示中の日付: <span id="selected-date"><%= dashboard.selectedDate %></span></p>
+        <p class="muted" id="overview-meta">
+          期間合計: <span id="overall-total"><%= dashboard.overallTotal %></span>人 /
           <% if (dashboard.recentEvents[0]) { %>
-            最新操作: <%= formatDateTime(dashboard.recentEvents[0].occurredAt) %> /
-            <%= dashboard.recentEvents[0].kind === 'increment' ? '来場登録' : '調整' %> /
-            <%= describeDelta(dashboard.recentEvents[0].delta) %>
+            最新操作: <span id="latest-occurred"><%= formatDateTime(dashboard.recentEvents[0].occurredAt) %></span> /
+            <span id="latest-kind"><%= dashboard.recentEvents[0].kind === 'increment' ? '来場登録' : '調整' %></span> /
+            <span id="latest-delta"><%= describeDelta(dashboard.recentEvents[0].delta) %></span>
           <% } else { %>
-            まだ記録がありません
+            <span id="latest-empty">まだ記録がありません</span>
           <% } %>
         </p>
       </section>
@@ -66,25 +66,25 @@
       <section class="card">
         <h2>人数登録</h2>
         <div class="quick-actions">
-          <form method="post" action="/count-events">
+          <form method="post" action="/count-events" class="count-form">
             <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
             <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="1" />
             <button type="submit" class="quick">1人</button>
           </form>
-          <form method="post" action="/count-events">
+          <form method="post" action="/count-events" class="count-form">
             <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
             <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="2" />
             <button type="submit" class="quick">2人</button>
           </form>
-          <form method="post" action="/count-events">
+          <form method="post" action="/count-events" class="count-form">
             <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
             <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="3" />
             <button type="submit" class="quick">3人</button>
           </form>
-          <form method="post" action="/count-events">
+          <form method="post" action="/count-events" class="count-form">
             <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
             <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="4" />
@@ -92,7 +92,7 @@
           </form>
         </div>
 
-        <form method="post" action="/count-events" class="stack">
+        <form method="post" action="/count-events" class="stack count-form" data-reset="1">
           <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
           <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
           <label>
@@ -108,44 +108,36 @@
       </section>
 
       <section class="card">
-        <h2>メモ</h2>
-        <p class="muted"><%= dashboard.selectedDate %> 分のメモを表示しています。</p>
-        <form method="post" action="/notes" class="stack">
-          <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
-          <input type="hidden" name="notedAt" value="<%= defaultOccurredAt %>" />
-          <label>
-            内容
-            <textarea name="body" rows="3" maxlength="300" required></textarea>
-          </label>
-          <button type="submit" class="secondary">メモを追加</button>
-        </form>
-
-        <div class="list">
-          <% for (const note of dashboard.notes) { %>
-            <article class="list-item">
-              <strong><%= formatDateTime(note.notedAt) %></strong>
-              <p><%= note.body %></p>
-            </article>
-          <% } %>
-        </div>
-      </section>
-
-      <section class="card">
         <div class="section-head">
           <h2>時間帯別集計</h2>
           <a href="/export.csv" class="link-button">CSV 出力</a>
         </div>
-        <div class="list">
-          <% for (const bucket of dashboard.hourlyBuckets) { %>
-            <article class="list-item inline">
-              <strong><%= bucket.label %>時台</strong>
-              <span><%= bucket.total %>人</span>
-            </article>
-          <% } %>
-          <% if (dashboard.hourlyBuckets.length === 0) { %>
-            <p class="muted">まだ記録がありません。</p>
+        <div class="legend" id="hourly-legend">
+          <% for (const series of dashboard.hourlyComparison.series) { %>
+            <div class="legend-item">
+              <span class="legend-swatch <%= series.key %>"></span>
+              <span><%= series.date %></span>
+            </div>
           <% } %>
         </div>
+        <div class="comparison-chart" id="hourly-chart">
+          <% dashboard.hourlyComparison.hours.forEach((hour, index) => { %>
+            <div class="hour-group">
+              <div class="bars">
+                <% for (const series of dashboard.hourlyComparison.series) { %>
+                  <% const total = series.totals[index]; %>
+                  <div class="bar <%= series.key %>" style="height: <%= series.percents[index] %>%">
+                    <% if (total > 0) { %>
+                      <span class="bar-value"><%= total %></span>
+                    <% } %>
+                  </div>
+                <% } %>
+              </div>
+              <div class="hour-label"><%= hour %></div>
+            </div>
+          <% }) %>
+        </div>
+        <p class="muted">最大値: <span id="hourly-max"><%= dashboard.hourlyComparison.maxTotal %></span>人</p>
       </section>
 
       <section class="card wide" id="log">
@@ -161,9 +153,9 @@
                 <th>操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="log-rows">
               <% for (const event of dashboard.recentEvents) { %>
-                <% if (editingEvent && editingEvent.id === event.id) { %>
+                <% if (editingEvent && editingEvent.id === event.id && !event.deletedAt) { %>
                   <% const editFormId = `edit-event-${event.id}`; %>
                   <tr class="editing-row">
                     <td>
@@ -188,18 +180,27 @@
                     </td>
                   </tr>
                 <% } else { %>
-                  <tr>
+                  <tr class="<%= event.deletedAt ? 'deleted-row' : '' %>">
                     <td><%= formatDateTime(event.occurredAt) %></td>
                     <td><%= describeDelta(event.delta) %></td>
                     <td><%= event.reason || '-' %></td>
                     <td>
                       <div class="row-actions">
-                        <a href="/?day=<%= dashboard.selectedDate %>&editEventId=<%= event.id %>#log" class="link-button small">編集</a>
-                        <form method="post" action="/count-events/<%= event.id %>/delete" onsubmit="return confirm('この記録を削除しますか？');">
-                          <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
-                          <input type="hidden" name="returnToLog" value="1" />
-                          <button type="submit" class="warning small">削除</button>
-                        </form>
+                        <% if (event.deletedAt) { %>
+                          <span class="muted">削除済み</span>
+                          <form method="post" action="/count-events/<%= event.id %>/restore">
+                            <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+                            <input type="hidden" name="returnToLog" value="1" />
+                            <button type="submit" class="secondary small">復元</button>
+                          </form>
+                        <% } else { %>
+                          <a href="/?day=<%= dashboard.selectedDate %>&editEventId=<%= event.id %>#log" class="link-button small">編集</a>
+                          <form method="post" action="/count-events/<%= event.id %>/delete" onsubmit="return confirm('この記録を削除しますか？');">
+                            <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+                            <input type="hidden" name="returnToLog" value="1" />
+                            <button type="submit" class="warning small">削除</button>
+                          </form>
+                        <% } %>
                       </div>
                     </td>
                   </tr>
@@ -213,5 +214,225 @@
         </div>
       </section>
     </main>
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('day')) {
+          return;
+        }
+        const availableDates = <%- JSON.stringify(dashboard.availableDates) %>;
+        const now = new Date();
+        const localDate = [
+          String(now.getFullYear()),
+          String(now.getMonth() + 1).padStart(2, '0'),
+          String(now.getDate()).padStart(2, '0')
+        ].join('-');
+        if (!availableDates.includes(localDate)) {
+          return;
+        }
+        params.set('day', localDate);
+        const target = `/?${params.toString()}${window.location.hash}`;
+        if (target !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+          window.location.replace(target);
+        }
+      })();
+    </script>
+    <script>
+      (() => {
+        const countForms = document.querySelectorAll('form.count-form');
+        const selectedTotal = document.getElementById('selected-total');
+        const overallTotal = document.getElementById('overall-total');
+        const selectedDate = document.getElementById('selected-date');
+        const dayTabs = document.getElementById('day-tabs');
+        const hourlyLegend = document.getElementById('hourly-legend');
+        const hourlyChart = document.getElementById('hourly-chart');
+        const hourlyMax = document.getElementById('hourly-max');
+        const logRows = document.getElementById('log-rows');
+        const logEmpty = document.querySelector('#log .muted');
+
+        async function submitCountForm(form) {
+          const formData = new FormData(form);
+          const body = new URLSearchParams(formData);
+          const response = await fetch(form.action, {
+            method: 'POST',
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/x-www-form-urlencoded'
+            },
+            body
+          });
+          if (!response.ok) {
+            return;
+          }
+          if (form.dataset.reset === '1') {
+            form.reset();
+          }
+          await refreshDashboard();
+        }
+
+        countForms.forEach((form) => {
+          form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            submitCountForm(form);
+          });
+        });
+
+        function renderDayTabs(dashboard) {
+          if (!dayTabs) {
+            return;
+          }
+          dayTabs.innerHTML = dashboard.dailyTotals
+            .map((day) => {
+              const active = dashboard.selectedDate === day.date ? 'active' : '';
+              return `
+                <a href="/?day=${day.date}" class="day-tab ${active}">
+                  <strong>${day.date}</strong>
+                  <span>${day.total}人</span>
+                </a>
+              `;
+            })
+            .join('');
+        }
+
+        function renderOverview(dashboard) {
+          if (selectedTotal) {
+            selectedTotal.textContent = dashboard.total;
+          }
+          if (overallTotal) {
+            overallTotal.textContent = dashboard.overallTotal;
+          }
+          if (selectedDate) {
+            selectedDate.textContent = dashboard.selectedDate;
+          }
+          const latest = dashboard.recentEvents[0];
+          const overviewMeta = document.getElementById('overview-meta');
+          if (overviewMeta) {
+            if (latest) {
+              overviewMeta.innerHTML = `期間合計: <span id="overall-total">${dashboard.overallTotal}</span>人 / 最新操作: <span id="latest-occurred">${formatDateTime(latest.occurredAt, dashboard.settings?.timezone)}</span> / <span id="latest-kind">${latest.kind === 'increment' ? '来場登録' : '調整'}</span> / <span id="latest-delta">${describeDelta(latest.delta)}</span>`;
+            } else {
+              overviewMeta.innerHTML = `期間合計: <span id="overall-total">${dashboard.overallTotal}</span>人 / <span id="latest-empty">まだ記録がありません</span>`;
+            }
+          }
+        }
+
+        function renderHourlyChart(dashboard) {
+          if (!hourlyLegend || !hourlyChart || !hourlyMax) {
+            return;
+          }
+          hourlyLegend.innerHTML = dashboard.hourlyComparison.series
+            .map((series) => `
+              <div class="legend-item">
+                <span class="legend-swatch ${series.key}"></span>
+                <span>${series.date}</span>
+              </div>
+            `)
+            .join('');
+
+          hourlyChart.innerHTML = dashboard.hourlyComparison.hours
+            .map((hour, index) => {
+              const bars = dashboard.hourlyComparison.series
+                .map((series) => {
+                  const total = series.totals[index];
+                  const label = total > 0 ? `<span class="bar-value">${total}</span>` : '';
+                  return `<div class="bar ${series.key}" style="height: ${series.percents[index]}%">${label}</div>`;
+                })
+                .join('');
+              return `
+                <div class="hour-group">
+                  <div class="bars">${bars}</div>
+                  <div class="hour-label">${hour}</div>
+                </div>
+              `;
+            })
+            .join('');
+          hourlyMax.textContent = dashboard.hourlyComparison.maxTotal;
+        }
+
+        function renderLogRows(dashboard) {
+          if (!logRows) {
+            return;
+          }
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('editEventId')) {
+            return;
+          }
+          logRows.innerHTML = dashboard.recentEvents
+            .map((event) => {
+              const deleted = event.deletedAt ? 'deleted-row' : '';
+              const reason = event.reason || '-';
+              const occurredAt = formatDateTime(event.occurredAt, dashboard.settings?.timezone);
+              const action = event.deletedAt
+                ? `
+                    <span class="muted">削除済み</span>
+                    <form method="post" action="/count-events/${event.id}/restore">
+                      <input type="hidden" name="selectedDate" value="${dashboard.selectedDate}" />
+                      <input type="hidden" name="returnToLog" value="1" />
+                      <button type="submit" class="secondary small">復元</button>
+                    </form>
+                  `
+                : `
+                    <a href="/?day=${dashboard.selectedDate}&editEventId=${event.id}#log" class="link-button small">編集</a>
+                    <form method="post" action="/count-events/${event.id}/delete" onsubmit="return confirm('この記録を削除しますか？');">
+                      <input type="hidden" name="selectedDate" value="${dashboard.selectedDate}" />
+                      <input type="hidden" name="returnToLog" value="1" />
+                      <button type="submit" class="warning small">削除</button>
+                    </form>
+                  `;
+              return `
+                <tr class="${deleted}">
+                  <td>${occurredAt}</td>
+                  <td>${describeDelta(event.delta)}</td>
+                  <td>${reason}</td>
+                  <td>
+                    <div class="row-actions">${action}</div>
+                  </td>
+                </tr>
+              `;
+            })
+            .join('');
+          if (logEmpty) {
+            logEmpty.style.display = dashboard.recentEvents.length === 0 ? 'block' : 'none';
+          }
+        }
+
+        function describeDelta(delta) {
+          if (delta > 0) {
+            return `${delta}人`;
+          }
+          return `${Math.abs(delta)}人減`;
+        }
+
+        function formatDateTime(value, timeZone) {
+          const timezone = timeZone || 'Asia/Tokyo';
+          return new Intl.DateTimeFormat('ja-JP', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }).format(new Date(value));
+        }
+
+        async function refreshDashboard() {
+          const response = await fetch('/dashboard', {
+            headers: {
+              accept: 'application/json'
+            }
+          });
+          if (!response.ok) {
+            return;
+          }
+          const dashboard = await response.json();
+          renderDayTabs(dashboard);
+          renderOverview(dashboard);
+          renderHourlyChart(dashboard);
+          renderLogRows(dashboard);
+        }
+
+        refreshDashboard();
+        setInterval(refreshDashboard, 1000);
+      })();
+    </script>
   </body>
 </html>

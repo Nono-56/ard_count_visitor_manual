@@ -163,6 +163,9 @@ function createApp({ repo, config }) {
     if (!existing) {
       return handleInvalidRequest(req, res, '対象の記録が見つかりません。');
     }
+    if (existing.deletedAt) {
+      return handleInvalidRequest(req, res, '削除済みの記録は編集できません。');
+    }
 
     await repo.updateCountEvent(id, {
       occurredAt,
@@ -187,30 +190,24 @@ function createApp({ repo, config }) {
     return handleSuccess(req, res, '操作ログを削除しました。');
   });
 
-  app.post('/notes', requireAuth, async (req, res) => {
-    const body = String(req.body.body || '').trim();
-    const notedAt = parseIsoOrNow(req.body.notedAt);
-
-    if (!body) {
-      return handleInvalidRequest(req, res, 'メモ内容を入力してください。');
-    }
-    if (!notedAt) {
-      return handleInvalidRequest(req, res, '日時の形式が不正です。');
+  app.post('/count-events/:id/restore', requireAuth, async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) {
+      return handleInvalidRequest(req, res, '対象の記録が見つかりません。');
     }
 
-    await repo.createNote({
-      body,
-      notedAt
-    });
+    const restored = await repo.restoreCountEvent(id);
+    if (!restored) {
+      return handleInvalidRequest(req, res, '対象の記録が見つかりません。');
+    }
 
-    return handleSuccess(req, res, 'メモを追加しました。');
+    return handleSuccess(req, res, '操作ログを復元しました。');
   });
 
   app.get('/export.csv', requireAuth, async (_req, res) => {
     const settings = await repo.getSettings();
     const events = await repo.listAllCountEvents();
     const dashboard = await repo.getDashboardData(settings, settings.eventDate);
-    const notes = await repo.listNotes(500);
 
     const lines = [
       `event_name,${escapeCsv(settings.eventName)}`,
@@ -221,12 +218,6 @@ function createApp({ repo, config }) {
       ...events.map((event) =>
         ['count_event', event.occurredAt, event.kind, String(event.delta), event.reason].map(escapeCsv).join(',')
       ),
-      '',
-      'type,noted_at,body',
-      ...notes.map((note) =>
-        ['note', note.notedAt, note.body].map(escapeCsv).join(',')
-      ),
-      '',
       'type,hour_bucket,total',
       ...dashboard.hourlyBuckets.map((bucket) =>
         ['hourly_bucket', bucket.hourBucket, String(bucket.total)].map(escapeCsv).join(',')

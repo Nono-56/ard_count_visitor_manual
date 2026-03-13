@@ -233,6 +233,89 @@ button,
   align-items: center;
 }
 
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.legend-swatch.day-a,
+.bar.day-a {
+  background: #0d9488;
+}
+
+.legend-swatch.day-b,
+.bar.day-b {
+  background: #f59e0b;
+}
+
+.comparison-chart {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+  min-height: 220px;
+  padding: 12px 4px 6px;
+  border: 1px solid #eee5d8;
+  border-radius: 16px;
+  background: #fdfaf5;
+}
+
+.hour-group {
+  display: grid;
+  gap: 6px;
+  align-items: end;
+  height: 100%;
+}
+
+.bars {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 6px;
+  align-items: end;
+  height: 100%;
+}
+
+.bar {
+  width: 100%;
+  border-radius: 10px 10px 6px 6px;
+  position: relative;
+  min-height: 8px;
+  opacity: 0.9;
+}
+
+.bar-value {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.hour-label {
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--muted);
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -252,6 +335,14 @@ button,
 
 .editing-row td {
   vertical-align: top;
+}
+
+.deleted-row {
+  opacity: 0.6;
+}
+
+.deleted-row td {
+  text-decoration: line-through;
 }
 
 table {
@@ -284,5 +375,14 @@ td {
   .row-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .comparison-chart {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    row-gap: 16px;
+  }
+
+  .hour-group {
+    min-height: 140px;
   }
 }
