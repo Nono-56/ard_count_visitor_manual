@@ -190,6 +190,30 @@ button,
   align-items: center;
 }
 
+.day-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.day-tab {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  text-decoration: none;
+  background: #f8f5ef;
+  color: var(--ink);
+  border: 1px solid transparent;
+}
+
+.day-tab.active {
+  background: #e7f3f0;
+  border-color: rgba(0, 109, 91, 0.24);
+  color: var(--accent-strong);
+}
+
 .list {
   display: grid;
   gap: 10px;

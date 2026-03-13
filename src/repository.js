@@ -18,6 +18,7 @@ class SQLiteRepository {
         id INTEGER PRIMARY KEY CHECK (id = 1),
         event_name TEXT NOT NULL,
         event_date TEXT NOT NULL,
+        event_end_date TEXT NOT NULL DEFAULT '',
         timezone TEXT NOT NULL,
         public_hostname TEXT NOT NULL,
         staff_password_hash TEXT NOT NULL,
@@ -47,6 +48,7 @@ class SQLiteRepository {
       CREATE INDEX IF NOT EXISTS notes_noted_at_idx
       ON notes (noted_at DESC);
     `);
+    ensureColumn(this.db, 'event_settings', 'event_end_date', `ALTER TABLE event_settings ADD COLUMN event_end_date TEXT NOT NULL DEFAULT ''`);
   }
 
   async close() {
@@ -56,11 +58,12 @@ class SQLiteRepository {
   async syncSettings(settings) {
     const statement = this.db.prepare(`
       INSERT INTO event_settings (
-        id, event_name, event_date, timezone, public_hostname, staff_password_hash, created_at, updated_at
-      ) VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        id, event_name, event_date, event_end_date, timezone, public_hostname, staff_password_hash, created_at, updated_at
+      ) VALUES (1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
         event_name = excluded.event_name,
         event_date = excluded.event_date,
+        event_end_date = excluded.event_end_date,
         timezone = excluded.timezone,
         public_hostname = excluded.public_hostname,
         staff_password_hash = excluded.staff_password_hash,
@@ -69,6 +72,7 @@ class SQLiteRepository {
     statement.run(
       settings.eventName,
       settings.eventDate,
+      settings.eventEndDate,
       settings.timezone,
       settings.publicHostname,
       settings.staffPasswordHash
@@ -78,7 +82,7 @@ class SQLiteRepository {
 
   async getSettings() {
     const row = this.db.prepare(`
-      SELECT id, event_name, event_date, timezone, public_hostname, staff_password_hash
+      SELECT id, event_name, event_date, event_end_date, timezone, public_hostname, staff_password_hash
       FROM event_settings
       WHERE id = 1
     `).get();
@@ -168,16 +172,29 @@ class SQLiteRepository {
     return rows.map(mapNote);
   }
 
-  async getDashboardData(timezone) {
+  async getDashboardData(settings, selectedDate) {
     const events = await this.listAllCountEvents();
-    const notes = await this.listNotes(20);
-    const hourlyBuckets = buildHourlyBuckets(events, timezone).slice(0, 24);
+    const notes = await this.listNotes(200);
+    const availableDates = buildDateRange(settings.eventDate, settings.eventEndDate || settings.eventDate);
+    const activeDate = availableDates.includes(selectedDate) ? selectedDate : availableDates[0];
+    const selectedEvents = events.filter((event) => buildDateKey(event.occurredAt, settings.timezone) === activeDate);
+    const selectedNotes = notes.filter((note) => buildDateKey(note.notedAt, settings.timezone) === activeDate);
+    const hourlyBuckets = buildHourlyBuckets(selectedEvents, settings.timezone).slice(0, 24);
 
     return {
-      total: events.reduce((sum, event) => sum + event.delta, 0),
+      total: selectedEvents.reduce((sum, event) => sum + event.delta, 0),
+      overallTotal: events.reduce((sum, event) => sum + event.delta, 0),
+      availableDates,
+      selectedDate: activeDate,
+      dailyTotals: availableDates.map((date) => ({
+        date,
+        total: events
+          .filter((event) => buildDateKey(event.occurredAt, settings.timezone) === date)
+          .reduce((sum, event) => sum + event.delta, 0)
+      })),
       hourlyBuckets,
-      recentEvents: [...events].sort(compareByOccurredDesc).slice(0, 20),
-      notes
+      recentEvents: [...selectedEvents].sort(compareByOccurredDesc).slice(0, 20),
+      notes: [...selectedNotes].sort(compareByNotedDesc).slice(0, 20)
     };
   }
 }
@@ -196,6 +213,16 @@ function buildHourlyBuckets(events, timezone) {
 }
 
 function buildHourBucketKey(value, timezone) {
+  const values = getDateParts(value, timezone);
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:00:00`;
+}
+
+function buildDateKey(value, timezone) {
+  const values = getDateParts(value, timezone);
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function getDateParts(value, timezone) {
   const parts = new Intl.DateTimeFormat('sv-SE', {
     timeZone: timezone,
     year: 'numeric',
@@ -205,8 +232,27 @@ function buildHourBucketKey(value, timezone) {
     hourCycle: 'h23'
   }).formatToParts(new Date(value));
 
-  const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}T${values.hour}:00:00`;
+  return Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+}
+
+function buildDateRange(startDate, endDate) {
+  const dates = [];
+  const current = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return dates;
+}
+
+function ensureColumn(db, tableName, columnName, sql) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (!columns.some((column) => column.name === columnName)) {
+    db.exec(sql);
+  }
 }
 
 function compareByOccurredDesc(a, b) {
@@ -216,11 +262,19 @@ function compareByOccurredDesc(a, b) {
   return a.occurredAt < b.occurredAt ? 1 : -1;
 }
 
+function compareByNotedDesc(a, b) {
+  if (a.notedAt === b.notedAt) {
+    return b.id - a.id;
+  }
+  return a.notedAt < b.notedAt ? 1 : -1;
+}
+
 function mapSetting(row) {
   return {
     id: row.id,
     eventName: row.event_name,
     eventDate: row.event_date,
+    eventEndDate: row.event_end_date || row.event_date,
     timezone: row.timezone,
     publicHostname: row.public_hostname,
     staffPasswordHash: row.staff_password_hash

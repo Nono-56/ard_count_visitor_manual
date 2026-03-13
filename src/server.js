@@ -11,6 +11,7 @@ async function main() {
   await repo.syncSettings({
     eventName: config.eventName,
     eventDate: config.eventDate,
+    eventEndDate: config.eventEndDate,
     timezone: config.eventTimezone,
     publicHostname: config.publicHostname,
     staffPasswordHash: createPasswordHash(config.appPassword)

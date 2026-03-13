@@ -33,6 +33,7 @@ function createApp({ repo, config }) {
       res.locals.isAuthenticated = Boolean(req.session);
       res.locals.error = flash.error || '';
       res.locals.notice = flash.notice || '';
+      res.locals.selectedDate = String(req.query.day || '');
       res.locals.editEventId = Number.parseInt(String(req.query.editEventId || ''), 10) || null;
       res.locals.formatDateTime = (value) => formatDateTime(value, settings?.timezone || config.eventTimezone);
       res.locals.formatDateTimeInput = (value) => formatDateTimeInput(value, settings?.timezone || config.eventTimezone);
@@ -93,20 +94,23 @@ function createApp({ repo, config }) {
     res.redirect('/login');
   });
 
-  app.get('/', requireAuth, async (_req, res) => {
+  app.get('/', requireAuth, async (req, res) => {
     const settings = await repo.getSettings();
-    const dashboard = await repo.getDashboardData(settings.timezone);
+    const selectedDate = resolveSelectedDate(req.query.day, settings);
+    const dashboard = await repo.getDashboardData(settings, selectedDate);
     const editingEvent = res.locals.editEventId ? await repo.getCountEventById(res.locals.editEventId) : null;
     res.render('index', {
       dashboard,
       settings,
-      editingEvent
+      editingEvent,
+      defaultOccurredAt: buildDefaultOccurredAt(selectedDate, settings.timezone)
     });
   });
 
-  app.get('/dashboard', requireAuth, async (_req, res) => {
+  app.get('/dashboard', requireAuth, async (req, res) => {
     const settings = await repo.getSettings();
-    const dashboard = await repo.getDashboardData(settings.timezone);
+    const selectedDate = resolveSelectedDate(req.query.day, settings);
+    const dashboard = await repo.getDashboardData(settings, selectedDate);
     res.json({
       settings: sanitizeSettings(settings),
       ...dashboard
@@ -205,7 +209,7 @@ function createApp({ repo, config }) {
   app.get('/export.csv', requireAuth, async (_req, res) => {
     const settings = await repo.getSettings();
     const events = await repo.listAllCountEvents();
-    const dashboard = await repo.getDashboardData(settings.timezone);
+    const dashboard = await repo.getDashboardData(settings, settings.eventDate);
     const notes = await repo.listNotes(500);
 
     const lines = [
@@ -249,6 +253,7 @@ function sanitizeSettings(settings) {
   return {
     eventName: settings.eventName,
     eventDate: settings.eventDate,
+    eventEndDate: settings.eventEndDate,
     timezone: settings.timezone,
     publicHostname: settings.publicHostname
   };
@@ -259,8 +264,7 @@ function handleInvalidRequest(req, res, message) {
     setFlashCookie(res, { error: message }, {
       secure: req.secure || req.protocol === 'https' || process.env.NODE_ENV === 'production'
     });
-    const editQuery = req.body.editEventId ? `?editEventId=${encodeURIComponent(req.body.editEventId)}` : '';
-    return res.redirect('/' + editQuery + '#log');
+    return res.redirect('/' + buildDashboardQuery(req.body.selectedDate, req.body.editEventId) + '#log');
   }
   return res.status(400).json({ error: message });
 }
@@ -270,7 +274,7 @@ function handleSuccess(req, res, message) {
     setFlashCookie(res, { notice: message }, {
       secure: req.secure || req.protocol === 'https' || process.env.NODE_ENV === 'production'
     });
-    return res.redirect('/#log');
+    return res.redirect('/' + buildDashboardQuery(req.body.selectedDate) + '#log');
   }
   return res.status(201).json({ ok: true, message });
 }
@@ -314,6 +318,48 @@ function describeDelta(delta) {
     return `${delta}人`;
   }
   return `${Math.abs(delta)}人減`;
+}
+
+function resolveSelectedDate(value, settings) {
+  const start = settings.eventDate;
+  const end = settings.eventEndDate || settings.eventDate;
+  const availableDates = [];
+  const current = new Date(`${start}T00:00:00Z`);
+  const endDate = new Date(`${end}T00:00:00Z`);
+
+  while (current <= endDate) {
+    availableDates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  if (availableDates.includes(value)) {
+    return value;
+  }
+  return availableDates[0];
+}
+
+function buildDefaultOccurredAt(selectedDate, timeZone) {
+  const nowParts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(nowParts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  return `${selectedDate}T${values.hour}:${values.minute}:${values.second}+09:00`;
+}
+
+function buildDashboardQuery(selectedDate, editEventId) {
+  const params = new URLSearchParams();
+  if (selectedDate) {
+    params.set('day', selectedDate);
+  }
+  if (editEventId) {
+    params.set('editEventId', editEventId);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : '';
 }
 
 module.exports = {

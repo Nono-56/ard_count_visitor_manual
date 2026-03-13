@@ -15,6 +15,7 @@ function loadConfig() {
     sessionSecret: required('SESSION_SECRET'),
     eventName: process.env.EVENT_NAME || '来場者数管理',
     eventDate: process.env.EVENT_DATE || new Date().toISOString().slice(0, 10),
+    eventEndDate: process.env.EVENT_END_DATE || process.env.EVENT_DATE || new Date().toISOString().slice(0, 10),
     eventTimezone: process.env.EVENT_TIMEZONE || 'Asia/Tokyo',
     publicHostname: process.env.PUBLIC_HOSTNAME || 'localhost'
   };

@@ -9,7 +9,13 @@
   <body>
     <header class="page-header">
       <div>
-        <p class="eyebrow"><%= settings.eventDate %> / <%= settings.timezone %></p>
+        <p class="eyebrow">
+          <%= settings.eventDate %>
+          <% if (settings.eventEndDate && settings.eventEndDate !== settings.eventDate) { %>
+            - <%= settings.eventEndDate %>
+          <% } %>
+          / <%= settings.timezone %>
+        </p>
         <h1><%= settings.eventName %></h1>
         <p class="muted">公開ホスト: <%= settings.publicHostname %></p>
       </div>
@@ -26,13 +32,29 @@
         <div class="banner error full"><%= error %></div>
       <% } %>
 
+      <section class="card full">
+        <div class="section-head">
+          <h2>表示日</h2>
+          <p class="muted">2日間のイベントを日別に切り替えて確認できます。</p>
+        </div>
+        <div class="day-tabs">
+          <% for (const dayTotal of dashboard.dailyTotals) { %>
+            <a href="/?day=<%= dayTotal.date %>" class="day-tab <%= dashboard.selectedDate === dayTotal.date ? 'active' : '' %>">
+              <strong><%= dayTotal.date %></strong>
+              <span><%= dayTotal.total %>人</span>
+            </a>
+          <% } %>
+        </div>
+      </section>
+
       <section class="card hero">
-        <p class="eyebrow">Current Total</p>
+        <p class="eyebrow">Selected Day Total</p>
         <div class="total"><%= dashboard.total %></div>
+        <p class="muted">表示中の日付: <%= dashboard.selectedDate %></p>
         <p class="muted">
-          最新操作:
+          期間合計: <%= dashboard.overallTotal %>人 /
           <% if (dashboard.recentEvents[0]) { %>
-            <%= formatDateTime(dashboard.recentEvents[0].occurredAt) %> /
+            最新操作: <%= formatDateTime(dashboard.recentEvents[0].occurredAt) %> /
             <%= dashboard.recentEvents[0].kind === 'increment' ? '来場登録' : '調整' %> /
             <%= describeDelta(dashboard.recentEvents[0].delta) %>
           <% } else { %>
@@ -45,24 +67,34 @@
         <h2>人数登録</h2>
         <div class="quick-actions">
           <form method="post" action="/count-events">
+            <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+            <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="1" />
             <button type="submit" class="quick">1人</button>
           </form>
           <form method="post" action="/count-events">
+            <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+            <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="2" />
             <button type="submit" class="quick">2人</button>
           </form>
           <form method="post" action="/count-events">
+            <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+            <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="3" />
             <button type="submit" class="quick">3人</button>
           </form>
           <form method="post" action="/count-events">
+            <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+            <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
             <input type="hidden" name="delta" value="4" />
             <button type="submit" class="quick">4人</button>
           </form>
         </div>
 
         <form method="post" action="/count-events" class="stack">
+          <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+          <input type="hidden" name="occurredAt" value="<%= defaultOccurredAt %>" />
           <label>
             任意の人数
             <input type="number" name="delta" min="1" step="1" required />
@@ -77,7 +109,10 @@
 
       <section class="card">
         <h2>メモ</h2>
+        <p class="muted"><%= dashboard.selectedDate %> 分のメモを表示しています。</p>
         <form method="post" action="/notes" class="stack">
+          <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+          <input type="hidden" name="notedAt" value="<%= defaultOccurredAt %>" />
           <label>
             内容
             <textarea name="body" rows="3" maxlength="300" required></textarea>
@@ -115,6 +150,7 @@
 
       <section class="card wide" id="log">
         <h2>操作ログ</h2>
+        <p class="muted"><%= dashboard.selectedDate %> 分のみ表示しています。</p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -132,6 +168,7 @@
                   <tr class="editing-row">
                     <td>
                       <form id="<%= editFormId %>" method="post" action="/count-events/<%= event.id %>/update">
+                        <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
                         <input type="hidden" name="editEventId" value="<%= event.id %>" />
                         <input type="datetime-local" name="occurredAt" value="<%= formatDateTimeInput(event.occurredAt) %>" required />
                       </form>
@@ -156,8 +193,9 @@
                     <td><%= event.reason || '-' %></td>
                     <td>
                       <div class="row-actions">
-                        <a href="/?editEventId=<%= event.id %>#log" class="link-button small">編集</a>
+                        <a href="/?day=<%= dashboard.selectedDate %>&editEventId=<%= event.id %>#log" class="link-button small">編集</a>
                         <form method="post" action="/count-events/<%= event.id %>/delete" onsubmit="return confirm('この記録を削除しますか？');">
+                          <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
                           <button type="submit" class="warning small">削除</button>
                         </form>
                       </div>
