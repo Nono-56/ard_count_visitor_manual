@@ -7,31 +7,11 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body class="tablet-page">
-    <header class="page-header tablet-header">
-      <div>
-        <% const formatTime = (value) => value ? value.split('T')[1].slice(0, 5) : ''; %>
-        <p class="eyebrow">
-          <%= settings.eventDate %>
-          <% if (settings.eventEndDate && settings.eventEndDate !== settings.eventDate) { %>
-            - <%= settings.eventEndDate %>
-          <% } %>
-          / <%= settings.timezone %>
-        </p>
-        <h1><%= settings.eventName %> Tablet</h1>
-        <p class="muted">
-          Day1: <%= settings.eventDate %> <%= formatTime(settings.day1Start) %>-<%= formatTime(settings.day1End) %>
-          / Day2: <%= settings.eventEndDate %> <%= formatTime(settings.day2Start) %>-<%= formatTime(settings.day2End) %>
-        </p>
-      </div>
-      <div class="tablet-header-actions">
-        <button type="button" class="secondary fullscreen-toggle" id="fullscreen-toggle">全画面表示</button>
-        <form method="post" action="/auth/logout">
-          <button type="submit" class="secondary">ログアウト</button>
-        </form>
-      </div>
-    </header>
-
     <main class="grid tablet-grid">
+      <div class="tablet-toolbar full tablet-controls">
+        <button type="button" class="secondary fullscreen-toggle" id="fullscreen-toggle">全画面表示</button>
+      </div>
+
       <% if (notice) { %>
         <div class="banner success full tablet-controls"><%= notice %></div>
       <% } %>
@@ -111,13 +91,16 @@
       </section>
     </main>
 
+    <script id="tablet-seed" type="application/json"><%- JSON.stringify({ availableDates: dashboard.availableDates }) %></script>
     <script>
       (() => {
+        const seedElement = document.getElementById('tablet-seed');
+        const seed = seedElement ? JSON.parse(seedElement.textContent || '{}') : {};
         const params = new URLSearchParams(window.location.search);
         if (params.has('day')) {
           return;
         }
-        const availableDates = <%- JSON.stringify(dashboard.availableDates) %>;
+        const availableDates = Array.isArray(seed.availableDates) ? seed.availableDates : [];
         const now = new Date();
         const localDate = [
           String(now.getFullYear()),

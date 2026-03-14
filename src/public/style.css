@@ -333,30 +333,26 @@ button,
 .tablet-page {
   height: 100dvh;
   overflow: hidden;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-.tablet-header {
-  padding-bottom: 4px;
-}
-
-.tablet-header-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 .fullscreen-toggle {
   min-width: 9rem;
 }
 
+.tablet-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
 .tablet-grid {
   height: 100%;
   grid-template-columns: minmax(340px, 0.95fr) minmax(420px, 1.05fr);
-  grid-template-rows: minmax(0, auto) minmax(0, 1fr);
+  grid-template-rows: repeat(2, minmax(0, auto)) minmax(0, 1fr);
   align-items: stretch;
   overflow: hidden;
 }
@@ -403,9 +399,15 @@ button,
   overflow: hidden;
 }
 
-.tablet-page.is-fullscreen .tablet-header,
+.tablet-page.is-fullscreen .tablet-toolbar,
 .tablet-page.is-fullscreen .tablet-controls,
 .tablet-page.is-fullscreen .fullscreen-toggle {
+  display: none;
+}
+
+.tablet-page.is-fullscreen .tablet-hero .eyebrow,
+.tablet-page.is-fullscreen .tablet-count > h2,
+.tablet-page.is-fullscreen .tablet-chart .section-head {
   display: none;
 }
 
@@ -441,7 +443,7 @@ button,
 @media (orientation: portrait) {
   .tablet-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, auto));
   }
 
   .tablet-page.is-fullscreen .tablet-grid {
@@ -502,13 +504,8 @@ td {
     padding: 20px 12px 8px;
   }
 
-  .tablet-header-actions {
+  .tablet-toolbar {
     width: 100%;
-    justify-content: stretch;
-  }
-
-  .tablet-header-actions > * {
-    flex: 1 1 0;
   }
 
   .row-actions {
