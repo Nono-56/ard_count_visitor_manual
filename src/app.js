@@ -106,6 +106,16 @@ function createApp({ repo, config }) {
     });
   });
 
+  app.get('/tablet', requireAuth, async (req, res) => {
+    const settings = await repo.getSettings();
+    const selectedDate = resolveSelectedDate(req.query.day, settings);
+    const dashboard = await repo.getDashboardData(settings, selectedDate);
+    res.render('tablet', {
+      dashboard,
+      settings
+    });
+  });
+
   app.get('/dashboard', requireAuth, async (req, res) => {
     const settings = await repo.getSettings();
     const selectedDate = resolveSelectedDate(req.query.day, settings);
@@ -342,7 +352,8 @@ function buildDashboardQuery(selectedDate, editEventId) {
 }
 
 function buildRedirectTarget(req) {
-  const base = '/' + buildDashboardQuery(req.body.selectedDate, req.body.editEventId);
+  const returnPath = String(req.body.returnPath || '') === '/tablet' ? '/tablet' : '/';
+  const base = returnPath + buildDashboardQuery(req.body.selectedDate, req.body.editEventId);
   const returnToLog = String(req.body.returnToLog || '') === '1';
   return returnToLog ? `${base}#log` : base;
 }

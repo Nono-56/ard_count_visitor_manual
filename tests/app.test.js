@@ -227,6 +227,17 @@ async function testAuthenticatedUserFlow() {
     assert.equal(dashboard.total, 4);
     assert.equal(dashboard.recentEvents.length, 2);
 
+    const tabletResponse = await fetch(`${baseUrl}/tablet`, {
+      headers: {
+        accept: 'text/html',
+        cookie
+      }
+    });
+    assert.equal(tabletResponse.status, 200);
+    const tabletHtml = await tabletResponse.text();
+    assert.match(tabletHtml, /Tablet/);
+    assert.match(tabletHtml, /全画面表示/);
+
     const csvResponse = await fetch(`${baseUrl}/export.csv`, {
       headers: {
         cookie
@@ -356,8 +367,15 @@ async function testProtectedEndpointsRequireAuth() {
         accept: 'application/json'
       }
     });
+    const tabletResponse = await fetch(`${baseUrl}/tablet`, {
+      headers: {
+        accept: 'text/html'
+      },
+      redirect: 'manual'
+    });
 
     assert.equal(response.status, 401);
+    assert.equal(tabletResponse.status, 302);
   } finally {
     await stopTestServer(server);
   }

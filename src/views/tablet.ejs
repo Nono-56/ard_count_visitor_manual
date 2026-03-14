@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= settings.eventName %> | Tablet</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="tablet-page">
+    <header class="page-header tablet-header">
+      <div>
+        <% const formatTime = (value) => value ? value.split('T')[1].slice(0, 5) : ''; %>
+        <p class="eyebrow">
+          <%= settings.eventDate %>
+          <% if (settings.eventEndDate && settings.eventEndDate !== settings.eventDate) { %>
+            - <%= settings.eventEndDate %>
+          <% } %>
+          / <%= settings.timezone %>
+        </p>
+        <h1><%= settings.eventName %> Tablet</h1>
+        <p class="muted">
+          Day1: <%= settings.eventDate %> <%= formatTime(settings.day1Start) %>-<%= formatTime(settings.day1End) %>
+          / Day2: <%= settings.eventEndDate %> <%= formatTime(settings.day2Start) %>-<%= formatTime(settings.day2End) %>
+        </p>
+      </div>
+      <div class="tablet-header-actions">
+        <button type="button" class="secondary fullscreen-toggle" id="fullscreen-toggle">全画面表示</button>
+        <form method="post" action="/auth/logout">
+          <button type="submit" class="secondary">ログアウト</button>
+        </form>
+      </div>
+    </header>
+
+    <main class="grid tablet-grid">
+      <% if (notice) { %>
+        <div class="banner success full tablet-controls"><%= notice %></div>
+      <% } %>
+      <% if (error) { %>
+        <div class="banner error full tablet-controls"><%= error %></div>
+      <% } %>
+
+      <section class="card full tablet-controls">
+        <div class="section-head">
+          <h2>表示日</h2>
+          <p class="muted">日付を切り替えて集計を確認できます。</p>
+        </div>
+        <div class="day-tabs" id="day-tabs">
+          <% for (const dayTotal of dashboard.dailyTotals) { %>
+            <a href="/tablet?day=<%= dayTotal.date %>" class="day-tab <%= dashboard.selectedDate === dayTotal.date ? 'active' : '' %>">
+              <strong><%= dayTotal.date %></strong>
+              <span><%= dayTotal.total %>人</span>
+            </a>
+          <% } %>
+        </div>
+      </section>
+
+      <section class="card hero tablet-hero">
+        <p class="eyebrow">Selected Day Total</p>
+        <div class="total" id="selected-total"><%= dashboard.total %></div>
+        <p class="muted">表示中の日付: <span id="selected-date"><%= dashboard.selectedDate %></span></p>
+        <p class="muted" id="overview-meta">
+          期間合計: <span id="overall-total"><%= dashboard.overallTotal %></span>人
+        </p>
+      </section>
+
+      <section class="card tablet-count">
+        <h2>人数登録</h2>
+        <div class="quick-actions tablet-quick-actions">
+          <% for (const size of [1, 2, 3, 4]) { %>
+            <form method="post" action="/count-events" class="count-form">
+              <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+              <input type="hidden" name="returnPath" value="/tablet" />
+              <input type="hidden" name="delta" value="<%= size %>" />
+              <button type="submit" class="quick"><%= size %>人</button>
+            </form>
+          <% } %>
+        </div>
+
+        <form method="post" action="/count-events" class="stack count-form tablet-custom-form" data-reset="1">
+          <input type="hidden" name="selectedDate" value="<%= dashboard.selectedDate %>" />
+          <input type="hidden" name="returnPath" value="/tablet" />
+          <label>
+            任意の人数
+            <input type="number" name="delta" min="1" step="1" required />
+          </label>
+          <button type="submit" class="primary">人数を登録</button>
+        </form>
+      </section>
+
+      <section class="card tablet-chart">
+        <div class="section-head">
+          <h2>時間帯別集計</h2>
+        </div>
+        <div class="legend" id="hourly-legend">
+          <% for (const series of dashboard.hourlyComparison.series) { %>
+            <div class="legend-item">
+              <span class="legend-swatch <%= series.key %>"></span>
+              <span><%= series.date %></span>
+            </div>
+          <% } %>
+        </div>
+        <div class="comparison-chart tablet-comparison-chart" id="hourly-chart">
+          <svg class="line-chart" viewBox="0 0 240 120" preserveAspectRatio="none"></svg>
+          <div class="hour-labels">
+            <% dashboard.hourlyComparison.hours.forEach((hour) => { %>
+              <span><%= hour %></span>
+            <% }) %>
+          </div>
+        </div>
+        <p class="muted">最大値: <span id="hourly-max"><%= dashboard.hourlyComparison.maxTotal %></span>人</p>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('day')) {
+          return;
+        }
+        const availableDates = <%- JSON.stringify(dashboard.availableDates) %>;
+        const now = new Date();
+        const localDate = [
+          String(now.getFullYear()),
+          String(now.getMonth() + 1).padStart(2, '0'),
+          String(now.getDate()).padStart(2, '0')
+        ].join('-');
+        if (!availableDates.includes(localDate)) {
+          return;
+        }
+        params.set('day', localDate);
+        const target = `/tablet?${params.toString()}${window.location.hash}`;
+        if (target !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+          window.location.replace(target);
+        }
+      })();
+    </script>
+    <script>
+      (() => {
+        const countForms = document.querySelectorAll('form.count-form');
+        const selectedTotal = document.getElementById('selected-total');
+        const overallTotal = document.getElementById('overall-total');
+        const selectedDate = document.getElementById('selected-date');
+        const dayTabs = document.getElementById('day-tabs');
+        const hourlyLegend = document.getElementById('hourly-legend');
+        const hourlyChart = document.getElementById('hourly-chart');
+        const hourlyMax = document.getElementById('hourly-max');
+        const fullscreenButton = document.getElementById('fullscreen-toggle');
+
+        async function submitCountForm(form) {
+          const formData = new FormData(form);
+          const body = new URLSearchParams(formData);
+          const response = await fetch(form.action, {
+            method: 'POST',
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/x-www-form-urlencoded'
+            },
+            body
+          });
+          if (!response.ok) {
+            return;
+          }
+          if (form.dataset.reset === '1') {
+            form.reset();
+          }
+          await refreshDashboard();
+        }
+
+        countForms.forEach((form) => {
+          form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            submitCountForm(form);
+          });
+        });
+
+        function renderDayTabs(dashboard) {
+          if (!dayTabs) {
+            return;
+          }
+          dayTabs.innerHTML = dashboard.dailyTotals
+            .map((day) => {
+              const active = dashboard.selectedDate === day.date ? 'active' : '';
+              return `
+                <a href="/tablet?day=${day.date}" class="day-tab ${active}">
+                  <strong>${day.date}</strong>
+                  <span>${day.total}人</span>
+                </a>
+              `;
+            })
+            .join('');
+        }
+
+        function renderOverview(dashboard) {
+          if (selectedTotal) {
+            selectedTotal.textContent = dashboard.total;
+          }
+          if (overallTotal) {
+            overallTotal.textContent = dashboard.overallTotal;
+          }
+          if (selectedDate) {
+            selectedDate.textContent = dashboard.selectedDate;
+          }
+        }
+
+        function renderHourlyChart(dashboard) {
+          if (!hourlyLegend || !hourlyChart || !hourlyMax) {
+            return;
+          }
+          hourlyLegend.innerHTML = dashboard.hourlyComparison.series
+            .map((series) => `
+              <div class="legend-item">
+                <span class="legend-swatch ${series.key}"></span>
+                <span>${series.date}</span>
+              </div>
+            `)
+            .join('');
+
+          const svg = hourlyChart.querySelector('svg');
+          const labels = hourlyChart.querySelector('.hour-labels');
+          if (!svg || !labels) {
+            return;
+          }
+          labels.innerHTML = dashboard.hourlyComparison.hours.map((hour) => `<span>${hour}</span>`).join('');
+          const maxTotal = dashboard.hourlyComparison.maxTotal || 1;
+          const width = 240;
+          const height = 120;
+          const paddingTop = 10;
+          const paddingBottom = 16;
+          const plotHeight = height - paddingTop - paddingBottom;
+          const step = width / (dashboard.hourlyComparison.hours.length - 1);
+          const lines = dashboard.hourlyComparison.series
+            .map((series) => {
+              const points = series.totals.map((total, index) => {
+                const x = Math.round(index * step);
+                const ratio = Math.min(total / maxTotal, 1);
+                const y = Math.round(paddingTop + (1 - ratio) * plotHeight);
+                return `${x},${y}`;
+              }).join(' ');
+              return `<polyline class="line ${series.key}" points="${points}" />`;
+            })
+            .join('');
+          svg.innerHTML = `
+            <rect class="line-grid" x="0" y="${paddingTop}" width="${width}" height="${plotHeight}" rx="12" />
+            ${lines}
+          `;
+          hourlyMax.textContent = dashboard.hourlyComparison.maxTotal;
+        }
+
+        function syncFullscreenState() {
+          document.body.classList.toggle('is-fullscreen', Boolean(document.fullscreenElement));
+        }
+
+        if (fullscreenButton) {
+          fullscreenButton.addEventListener('click', async () => {
+            try {
+              if (document.fullscreenElement) {
+                await document.exitFullscreen();
+              } else {
+                await document.documentElement.requestFullscreen();
+              }
+            } catch (_error) {
+            } finally {
+              syncFullscreenState();
+            }
+          });
+        }
+
+        document.addEventListener('fullscreenchange', syncFullscreenState);
+        syncFullscreenState();
+
+        async function refreshDashboard() {
+          const response = await fetch(`/dashboard${window.location.search}`, {
+            headers: {
+              accept: 'application/json'
+            }
+          });
+          if (!response.ok) {
+            return;
+          }
+          const dashboard = await response.json();
+          renderDayTabs(dashboard);
+          renderOverview(dashboard);
+          renderHourlyChart(dashboard);
+        }
+
+        refreshDashboard();
+        setInterval(refreshDashboard, 1000);
+      })();
+    </script>
+  </body>
+</html>
