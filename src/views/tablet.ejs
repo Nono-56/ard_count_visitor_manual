@@ -19,21 +19,6 @@
         <div class="banner error full tablet-controls"><%= error %></div>
       <% } %>
 
-      <section class="card full tablet-controls">
-        <div class="section-head">
-          <h2>表示日</h2>
-          <p class="muted">日付を切り替えて集計を確認できます。</p>
-        </div>
-        <div class="day-tabs" id="day-tabs">
-          <% for (const dayTotal of dashboard.dailyTotals) { %>
-            <a href="/tablet?day=<%= dayTotal.date %>" class="day-tab <%= dashboard.selectedDate === dayTotal.date ? 'active' : '' %>">
-              <strong><%= dayTotal.date %></strong>
-              <span><%= dayTotal.total %>人</span>
-            </a>
-          <% } %>
-        </div>
-      </section>
-
       <section class="card hero tablet-hero">
         <p class="eyebrow">Selected Day Total</p>
         <div class="total" id="selected-total"><%= dashboard.total %></div>
@@ -44,7 +29,7 @@
       </section>
 
       <section class="card tablet-count">
-        <h2>人数登録</h2>
+        <h2>来場者登録</h2>
         <div class="quick-actions tablet-quick-actions">
           <% for (const size of [1, 2, 3, 4]) { %>
             <form method="post" action="/count-events" class="count-form">
@@ -68,9 +53,6 @@
       </section>
 
       <section class="card tablet-chart">
-        <div class="section-head">
-          <h2>時間帯別集計</h2>
-        </div>
         <div class="legend" id="hourly-legend">
           <% for (const series of dashboard.hourlyComparison.series) { %>
             <div class="legend-item">
