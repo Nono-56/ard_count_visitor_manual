@@ -20,12 +20,16 @@
       <% } %>
 
       <section class="card hero tablet-hero">
-        <p class="eyebrow">Selected Day Total</p>
-        <div class="total" id="selected-total"><%= dashboard.total %></div>
-        <p class="muted">表示中の日付: <span id="selected-date"><%= dashboard.selectedDate %></span></p>
-        <p class="muted" id="overview-meta">
-          期間合計: <span id="overall-total"><%= dashboard.overallTotal %></span>人
-        </p>
+        <div class="tablet-hero-main">
+          <p class="eyebrow">Selected Day Total</p>
+          <div class="total" id="selected-total"><%= dashboard.total %></div>
+        </div>
+        <div class="tablet-hero-meta">
+          <p class="muted">表示中の日付: <span id="selected-date"><%= dashboard.selectedDate %></span></p>
+          <p class="muted" id="overview-meta">
+            期間合計: <span id="overall-total"><%= dashboard.overallTotal %></span>人
+          </p>
+        </div>
       </section>
 
       <section class="card tablet-count">

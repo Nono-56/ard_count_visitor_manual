@@ -366,7 +366,25 @@ button,
 
 .tablet-hero {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
   align-content: center;
+}
+
+.tablet-hero-main {
+  min-width: 0;
+}
+
+.tablet-hero-meta {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  text-align: right;
+}
+
+.tablet-hero-meta p {
+  margin: 0;
 }
 
 .tablet-count {
@@ -444,6 +462,15 @@ button,
   .tablet-grid {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(4, minmax(0, auto));
+  }
+
+  .tablet-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .tablet-hero-meta {
+    justify-items: start;
+    text-align: left;
   }
 
   .tablet-page.is-fullscreen .tablet-grid {
