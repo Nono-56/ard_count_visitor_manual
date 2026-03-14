@@ -23,9 +23,12 @@
           / Day2: <%= settings.eventEndDate %> <%= formatTime(settings.day2Start) %>-<%= formatTime(settings.day2End) %>
         </p>
       </div>
-      <form method="post" action="/auth/logout">
-        <button type="submit" class="secondary">ログアウト</button>
-      </form>
+      <div class="header-actions">
+        <button type="button" class="secondary fullscreen-toggle" id="fullscreen-toggle">全画面表示</button>
+        <form method="post" action="/auth/logout">
+          <button type="submit" class="secondary">ログアウト</button>
+        </form>
+      </div>
     </header>
 
     <main class="grid">
@@ -239,6 +242,7 @@
         const hourlyMax = document.getElementById('hourly-max');
         const logRows = document.getElementById('log-rows');
         const logEmpty = document.querySelector('#log .muted');
+        const fullscreenButton = document.getElementById('fullscreen-toggle');
 
         async function submitCountForm(form) {
           const formData = new FormData(form);
@@ -414,6 +418,28 @@
             minute: '2-digit'
           }).format(new Date(value));
         }
+
+        function syncFullscreenState() {
+          document.body.classList.toggle('is-fullscreen', Boolean(document.fullscreenElement));
+        }
+
+        if (fullscreenButton) {
+          fullscreenButton.addEventListener('click', async () => {
+            try {
+              if (document.fullscreenElement) {
+                await document.exitFullscreen();
+              } else {
+                await document.documentElement.requestFullscreen();
+              }
+            } catch (_error) {
+            } finally {
+              syncFullscreenState();
+            }
+          });
+        }
+
+        document.addEventListener('fullscreenchange', syncFullscreenState);
+        syncFullscreenState();
 
         async function refreshDashboard() {
           const response = await fetch(`/dashboard${window.location.search}`, {

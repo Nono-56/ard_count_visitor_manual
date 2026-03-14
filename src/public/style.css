@@ -53,6 +53,22 @@ body {
   padding: 24px 20px 8px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+body.is-fullscreen .page-header {
+  display: none;
+}
+
+body.is-fullscreen .grid {
+  padding-top: 24px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -514,6 +530,10 @@ td {
   .page-header {
     flex-direction: column;
     padding: 20px 12px 8px;
+  }
+
+  .header-actions {
+    width: 100%;
   }
 
   .tablet-toolbar {
