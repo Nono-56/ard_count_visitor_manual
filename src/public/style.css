@@ -351,8 +351,8 @@ button,
 
 .tablet-grid {
   height: 100%;
-  grid-template-columns: minmax(340px, 0.95fr) minmax(420px, 1.05fr);
-  grid-template-rows: repeat(2, minmax(0, auto)) minmax(0, 1fr);
+  grid-template-columns: minmax(340px, 0.9fr) minmax(420px, 1.1fr);
+  grid-template-rows: repeat(3, minmax(0, auto));
   align-items: stretch;
   overflow: hidden;
 }
@@ -365,6 +365,7 @@ button,
 }
 
 .tablet-hero {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 20px;
@@ -433,18 +434,19 @@ button,
   height: 100dvh;
   padding: 24px;
   gap: 20px;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .tablet-page.is-fullscreen .tablet-hero,
 .tablet-page.is-fullscreen .tablet-count,
 .tablet-page.is-fullscreen .tablet-chart {
-  height: calc(100dvh - 48px);
+  height: auto;
 }
 
 @media (orientation: landscape) {
   .tablet-page.is-fullscreen .tablet-grid {
-    grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 0.9fr) minmax(520px, 1.2fr);
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(360px, 0.9fr) minmax(560px, 1.1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .tablet-page.is-fullscreen .tablet-hero,
@@ -475,7 +477,7 @@ button,
 
   .tablet-page.is-fullscreen .tablet-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 0.9fr 1fr 1.5fr;
+    grid-template-rows: auto auto minmax(0, 1fr);
   }
 
   .tablet-page.is-fullscreen .tablet-hero,
