@@ -434,7 +434,6 @@ button,
   height: 100dvh;
   padding: 24px;
   gap: 20px;
-  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .tablet-page.is-fullscreen .tablet-hero,
@@ -444,17 +443,6 @@ button,
 }
 
 @media (orientation: landscape) {
-  .tablet-page.is-fullscreen .tablet-grid {
-    grid-template-columns: minmax(360px, 0.9fr) minmax(560px, 1.1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .tablet-page.is-fullscreen .tablet-hero,
-  .tablet-page.is-fullscreen .tablet-count,
-  .tablet-page.is-fullscreen .tablet-chart {
-    grid-column: auto;
-  }
-
   .tablet-page.is-fullscreen .tablet-comparison-chart .line-chart {
     height: min(62dvh, 760px);
   }
@@ -473,11 +461,6 @@ button,
   .tablet-hero-meta {
     justify-items: start;
     text-align: left;
-  }
-
-  .tablet-page.is-fullscreen .tablet-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto minmax(0, 1fr);
   }
 
   .tablet-page.is-fullscreen .tablet-hero,
